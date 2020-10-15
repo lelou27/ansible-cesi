@@ -1,0 +1,84 @@
+---
+- name: Create dest
+  file: state=directory name=/var/www/{{ project_name }}
+
+- name: Download Wordpress
+  unarchive: src=https://wordpress.org/latest.tar.gz dest=/var/www/{{ project_name }} copy=no
+
+- name: Change ownership of WordPress installation
+  file: path=/var/www/{{ project_name }}/ owner=www-data group=www-data state=directory recurse=yes
+
+- name: copy apache config
+  template: src=default.j2 dest=/etc/apache2/sites-available/{{ project_name }}.conf
+
+- name: copy wp-config.php wordpress config
+  template: src=wp-config.j2 dest=/var/www/{{ project_name }}/wordpress/wp-config.php
+
+- name: generate salt and unique keys from api.wordpress.org
+#  uri: url=https://api.wordpress.org/secret-key/1.1/salt/ return_content=True method=GET register=api_info
+  uri:
+    url: "https://api.wordpress.org/secret-key/1.1/salt/"
+    return_content: yes
+  register: api_info
+
+- name: customize wordpress salt and unique keys
+  lineinfile: path=/var/www/{{ project_name }}/wordpress/wp-config.php regex="put your unique keys here" insertafter="put your unique keys here" line={{ api_info.content }}
+
+- name: create link into sites-enabled
+  file: state=link src=/etc/apache2/sites-available/{{ project_name }}.conf dest=/etc/apache2/sites-enabled/{{ project_name }}.conf
+
+- name: remove default apache vhost
+  file: state=absent path=/etc/apache2/sites-enabled/000-default.conf
+
+- name: remove index.html from apache default
+  file: state=absent path=/var/www/html/index.html
+
+# this module is required to execute next task
+- name: install python mysql bindings
+  apt: name=python-mysqldb state=present
+
+- name: Install PyMySql via pip
+  pip:
+    name: PyMySQL
+
+- name: create database for wordpress site
+  mysql_db:
+    name: "{{ project_name }}"
+    login_user: "{{ mysql_user }}"
+    login_password: "{{ mysql_password }}"
+
+- name: enable rewrite module
+  apache2_module:
+    state: present
+    name: rewrite
+
+- name: enable php7.3 module
+  apache2_module:
+    state: present
+    name: php7.3
+
+- name: Install wp-cli
+  shell: curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+  args:
+    chdir: /usr/local/bin/
+
+- name: Rename wp-cli.phar into wp
+  command: "mv /usr/local/bin/wp-cli.phar /usr/local/bin/wp"
+
+- name: Change ownership of wp cli
+  file:
+    path: /usr/local/bin/wp
+    owner: www-data
+    group: www-data
+    mode: a+x
+
+- name: Setup of Wordpress over CLI
+  become: yes
+  become_method: sudo
+  become_user: www-data
+  command: "wp core install --url={{ host_name }} --title={{ project_name }} --admin_user=admin --admin_password=admin --admin_email=toutainj@gmail.com"
+  args:
+    chdir:  "/var/www/{{ project_name }}/wordpress/"
+
+- name: restart apache2
+  service: name=apache2 state=restarted

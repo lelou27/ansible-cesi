@@ -1,0 +1,14 @@
+---
+- name: Install common packages
+  apt:
+    pkg:
+      - git
+      - htop
+      - curl
+      - unzip
+      - iotop
+      - iftop
+      - screen
+      - open-vm-tools
+    state: present
+    update_cache: yes

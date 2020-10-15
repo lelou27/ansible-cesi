@@ -1,0 +1,15 @@
+<VirtualHost *:80>
+     DocumentRoot /var/www/prestashop/{{ project_name }}/
+     ServerName {{ host_name }}
+     ServerAlias {{ host_name }}
+
+     <Directory /var/www/prestashop/{{ project_name }}/>
+        Options +FollowSymlinks
+        AllowOverride All
+        Require all granted
+     </Directory>
+
+     ErrorLog ${APACHE_LOG_DIR}/error.log
+     CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+</VirtualHost>

@@ -1,0 +1,41 @@
+---
+- name: Create dest
+  file: state=directory name=/var/www/{{ project_name }}
+
+- name: Make dir for prestashop
+  file:  path=/var/www/prestashop/{{ project_name }}/ owner=www-data group=www-data state=directory recurse=yes
+
+- name: Download Prestashop
+  unarchive: src=https://download.prestashop.com/download/releases/prestashop_1.7.6.8.zip dest=/var/www/prestashop/{{ project_name }} copy=no
+
+- name: Unzip archive of Prestashop
+  unarchive: src=/var/www/prestashop/{{ project_name }}/prestashop.zip dest=/var/www/prestashop/{{ project_name }}  copy=no
+
+- name: Remove zip of prestashop
+  file: path=/var/www/prestashop/{{ project_name }}/prestashop.zip state=absent
+
+- name: Change ownership of prestashop installation
+  file: path=/var/www/prestashop/{{ project_name }}/ owner=www-data group=www-data state=directory recurse=yes
+
+- name: copy apache config
+  template: src=prestashop.j2 dest=/etc/apache2/sites-available/{{ project_name }}_prestashop.conf
+
+- name: create link into sites-enabled
+  file: state=link src=/etc/apache2/sites-available/{{ project_name }}_prestashop.conf dest=/etc/apache2/sites-enabled/{{ project_name }}_prestashop.conf
+
+- name: Remove wordpress config for tests
+  file: state=link path=/etc/apache2/sites-available/{{ project_name }}.conf state=absent
+
+- name: Installing required dependencies
+  command: apt-get -y install unzip php7.3 php7.3-cgi php7.3-cli php7.3-curl php7.3-fpm php7.3-gd php7.3-intl php7.3-mysql php7.3-xml php7.3-zip
+
+- name: restart apache2
+  service: name=apache2 state=restarted
+
+- name: Installation of prestashop
+  command: php /var/www/prestashop/{{ project_name }}/install/index_cli.php --domain=prestashop.local --db_user={{ mysql_user }} --db_password={{ mysql_password }} 
+           --db_name=presatashop_{{ project_name }} --db_create=1
+           --firstname=léandre --lastname=guegan --password=rootroot --email=test@gmail.com 
+
+- name: Change ownership of prestashop installation
+  file: path=/var/www/prestashop/{{ project_name }}/ owner=www-data group=www-data state=directory recurse=yes
